@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PIXEL ROAD v11</title>
+  <style>
+    * {
+      box-sizing: border-box
+    }
+
+    body {
+      margin: 0;
+      padding: 16px;
+      background: #202830;
+      color: #fff;
+      font-family: system-ui, sans-serif;
+      display: flex;
+      justify-content: center;
+    }
+
+    #game {
+      width: 100%;
+      max-width: 460px
+    }
+
+    .hud {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 7px;
+      margin-bottom: 10px
+    }
+
+    .stat {
+      background: #303b45;
+      border: 1px solid #59636c;
+      border-radius: 10px;
+      padding: 8px;
+      text-align: center
+    }
+
+    .stat small {
+      display: block;
+      font-size: 10px;
+      opacity: .7;
+      letter-spacing: 1px
+    }
+
+    .stat strong {
+      font-size: 21px;
+      font-variant-numeric: tabular-nums
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      background: #6eae54;
+      border-radius: 10px;
+      touch-action: none
+    }
+
+    .game-wrap {
+      position: relative;
+      width: 100%
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      background: #101820d9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+      padding: 15px
+    }
+
+    .panel {
+      width: min(100%, 300px);
+      background: #202d37;
+      color: white;
+      border: 1px solid #60717c;
+      border-radius: 14px;
+      padding: 18px;
+      text-align: center
+    }
+
+    button {
+      border: 1px solid #657984;
+      border-radius: 9px;
+      padding: 9px 13px;
+      background: #344854;
+      color: white;
+      font-weight: 650;
+      cursor: pointer
+    }
+
+    button:active {
+      transform: scale(.96)
+    }
+
+    .primary {
+      background: #1686c9;
+      border-color: #1686c9
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(3, 54px);
+      grid-template-rows: repeat(2, 43px);
+      gap: 5px;
+      justify-content: center;
+      margin: 12px
+    }
+
+    .controls button {
+      font-size: 20px;
+      padding: 0
+    }
+
+    .actions {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap
+    }
+
+    .hint {
+      font-size: 12px;
+      opacity: .7;
+      text-align: center;
+      margin-top: 10px
+    }
+  </style>
+</head>
+
+<body>
+  <div id="game">
+    <div class="hud">
+      <div class="stat"><small>SCORE</small><strong id="score">0</strong></div>
+      <div class="stat"><small>BEST</small><strong id="best">0</strong></div>
+      <div class="stat"><small>LEVEL</small><strong id="level">1</strong></div>
+    </div>
+
+    <div class="game-wrap">
+      <canvas id="canvas" width="432" height="610"></canvas>
+      <div class="overlay" id="menu">
+        <div class="panel">
+          <div style="font-size:29px;font-weight:900;letter-spacing:2px">PIXEL ROAD</div>
+          <div style="font-size:12px;opacity:.75;margin:5px 0 15px">CHOOSE YOUR DIFFICULTY</div>
+          <button class="primary" data-mode="beginner">初級<br><small>LEVEL 1</small></button>
+          <button data-mode="intermediate">中級<br><small>LEVEL 31</small></button>
+          <button data-mode="advanced">上級<br><small>LEVEL 61</small></button>
+          <div style="font-size:11px;opacity:.7;margin-top:12px">車を避けて、できるだけ遠くへ進もう！</div>
+        </div>
+      </div>
+      <div class="overlay" id="over" style="display:none">
+        <div class="panel">
+          <div style="font-size:28px;font-weight:900">GAME OVER</div>
+          <div id="result" style="margin:12px 0">SCORE 0</div>
+          <button class="primary" id="again">もう一度プレイ</button>
+          <button id="select">難易度選択</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <span></span><button data-move="up">▲</button><span></span>
+      <button data-move="left">◀</button>
+      <button data-move="down">▼</button>
+      <button data-move="right">▶</button>
+    </div>
+    <div class="actions">
+      <button id="restart">RESTART</button>
+      <button id="change">難易度変更</button>
+    </div>
+    <div class="hint">PC：矢印キー / WASD　・　スマホ：タップで前進、スワイプで移動</div>
+  </div>
+
+  <script>
+    (() => {
+      // ==========================================
+      // 調整用パラメータ：ここを変更してBuild
+      // ==========================================
+      const DESIGN = {
+        grassA: '#76b957',
+        grassB: '#69aa4e',
+        road: '#45494d',
+        roadEdge: '#35393d',
+        line: '#e9dba1',
+        player: '#f6d447',
+        playerDetail: '#d98b28',
+        cars: ['#e94f45', '#45a8e8', '#f3bd36', '#b47be5', '#f2f2ed', '#35bd8a'],
+        cell: 48
+      };
+
+      const DIFFICULTY = {
+        beginner: {
+          startLevel: 1,
+          baseSpeed: 105,
+          speedPerLevel: 5,
+          spawnMs: 1750,
+          maxCars: 2
+        },
+        intermediate: {
+          startLevel: 31,
+          baseSpeed: 175,
+          speedPerLevel: 6,
+          spawnMs: 1250,
+          maxCars: 3
+        },
+        advanced: {
+          startLevel: 61,
+          baseSpeed: 245,
+          speedPerLevel: 7,
+          spawnMs: 900,
+          maxCars: 4
+        }
+      };
+
+      const POINTS_PER_LEVEL = 10;
+      const LEVEL_SPEED_STEP = 5;
+      const LEVEL_SPAWN_STEP = 35;
+      const MOVE_INTERVAL = 190;
+
+      const W = 432, H = 610, C = DESIGN.cell, COLS = 9;
+
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+
+      const scoreEl = document.getElementById('score');
+      const bestEl = document.getElementById('best');
+      const levelEl = document.getElementById('level');
+      const menu = document.getElementById('menu');
+      const over = document.getElementById('over');
+      const result = document.getElementById('result');
+
+      let mode = 'beginner';
+      let score = 0, best = 0, level = 1;
+      let player = { x: 4, row: 1 };
+      let rows = [], camera = 0;
+      let running = false, dead = false;
+      let lastTime = 0, moveStamp = 0;
+      let held = null, heldStamp = 0, raf = 0;
+
+      try {
+        best = Number(localStorage.getItem('pixel-road-best') || 0);
+      } catch (e) { }
+      bestEl.textContent = best;
+
+      function cfg() { return DIFFICULTY[mode] }
+      function tierProgress() {
+        return Math.max(0, level - cfg().startLevel);
+      }
+      function speed() {
+        return cfg().baseSpeed +
+          tierProgress() * cfg().speedPerLevel;
+      }
+      function maxCars() {
+        return Math.min(7,
+          cfg().maxCars + Math.floor(tierProgress() / 5));
+      }
+      function spawnMs() {
+        return Math.max(380,
+          cfg().spawnMs - tierProgress() * LEVEL_SPAWN_STEP);
+      }
+      function updateHud() {
+        level = cfg().startLevel +
+          Math.floor(score / POINTS_PER_LEVEL);
+        scoreEl.textContent = score;
+        levelEl.textContent = level;
+        bestEl.textContent = best;
+      }
+
+      function makeLane(row) {
+        const dir = Math.random() < .5 ? -1 : 1;
+        const n = Math.min(maxCars(),
+          Math.max(1, Math.floor(spawnMs() < 700 ? 4 : 3)));
+        const gap = Math.max(78, 432 / (n + 0.5));
+        const cars = [];
+        const width = 30 + Math.random() * 13;
+
+        for (let i = 0; i < n; i++) {
+          const x = dir === 1 ? -i * gap - 20 : 432 + i * gap + 20;
+          cars.push({
+            x, w: width,
+            color: DESIGN.cars[
+              Math.floor(Math.random() * DESIGN.cars.length)
+            ],
+            variation: Math.random()
+          });
+        }
+        return {
+          type: 'road', dir, cars, lastSpawn: 0,
+          spawnGap: Math.max(95, gap), row
+        };
+      }
+
+      function makeRow(i) {
+        if (i <= 1 || Math.random() < .36) {
+          return { type: 'grass', shade: Math.random() < .5 };
+        }
+        return makeLane(i);
+      }
+
+      function ensureRows() {
+        while (rows.length < player.row + 24) {
+          rows.push(makeRow(rows.length));
+        }
+      }
+
+      function start(which) {
+        mode = which;
+        score = 0;
+        level = cfg().startLevel;
+        player = { x: 4, row: 1 };
+        camera = 0;
+        rows = [];
+
+        for (let i = 0; i < 32; i++) {
+          rows.push(i <= 1 ?
+            { type: 'grass', shade: i % 2 === 0 } : makeRow(i));
+        }
+
+        dead = false;
+        running = true;
+        held = null;
+        moveStamp = 0;
+
+        menu.style.display = 'none';
+        over.style.display = 'none';
+
+        updateHud();
+        lastTime = performance.now();
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(loop);
+      }
+
+      function endGame() {
+        if (dead) return;
+        dead = true;
+        running = false;
+        held = null;
+
+        if (score > best) {
+          best = score;
+          try {
+            localStorage.setItem('pixel-road-best', String(best));
+          } catch (e) { }
+        }
+
+        updateHud();
+        result.textContent = 'SCORE ' + score + '　 /　 LEVEL ' + level;
+        over.style.display = 'flex';
+      }
+
+      function move(dx, dy) {
+        if (!running || dead) return;
+
+        const now = performance.now();
+        if (now - moveStamp < MOVE_INTERVAL) return;
+        moveStamp = now;
+
+        const nx = Math.max(0, Math.min(COLS - 1, player.x + dx));
+        const nr = Math.max(0, player.row + dy);
+
+        if (nx === player.x && nr === player.row) return;
+
+        player.x = nx;
+        player.row = nr;
+
+        if (dy > 0) {
+          score++;
+          updateHud();
+          ensureRows();
+        }
+
+        camera = Math.max(0, player.row - 5);
+        if (hit()) endGame();
+      }
+
+      function hit() {
+        const row = rows[player.row];
+        if (!row || row.type !== 'road') return false;
+
+        const px = player.x * C + C / 2;
+        return row.cars.some(car =>
+          Math.abs(px - car.x) < car.w / 2 + 12
+        );
+      }
+
+      function update(dt, now) {
+        for (const row of rows) {
+          if (row.type !== 'road') continue;
+
+          const v = speed() * (row.dir || 1) * dt / 1000;
+          for (const car of row.cars) car.x += v;
+
+          row.cars = row.cars.filter(car =>
+            row.dir === 1 ? car.x < 500 : car.x > -70
+          );
+
+          const count = Math.min(maxCars(),
+            Math.max(1, Math.floor(432 / Math.max(90, row.spawnGap)))
+          );
+
+          if (row.cars.length < count &&
+            now - row.lastSpawn > spawnMs()) {
+            const edge = row.dir === 1 ? -40 : 472;
+            const safe = row.cars.every(car =>
+              Math.abs(car.x - edge) > row.spawnGap
+            );
+
+            if (safe) {
+              row.cars.push({
+                x: edge,
+                w: 32 + Math.random() * 12,
+                color: DESIGN.cars[
+                  Math.floor(Math.random() * DESIGN.cars.length)
+                ]
+              });
+              row.lastSpawn = now;
+            }
+          }
+        }
+
+        if (hit()) endGame();
+
+        if (held && now - heldStamp >= MOVE_INTERVAL) {
+          heldStamp = now;
+          move(held.dx, held.dy);
+        }
+      }
+
+      function rect(x, y, w, h, color) {
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y, w, h);
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, W, H);
+
+        const start = Math.max(0, camera - 1);
+        const end = camera + Math.ceil(H / C) + 2;
+
+        for (let i = start; i < Math.min(rows.length, end); i++) {
+          const row = rows[i];
+          const y = H - C - (i - camera) * C;
+
+          if (y < -C || y > H) continue;
+
+          if (row.type === 'grass') {
+            rect(0, y, W, C,
+              row.shade ? DESIGN.grassA : DESIGN.grassB
+            );
+
+            for (let j = 0; j < 12; j++) {
+              const x = (j * 47 + (i * 29) % 43) % W;
+              rect(x, y + ((j * 17 + i * 11) % 37), 3, 3, '#ffffff18');
+            }
+          } else {
+            rect(0, y, W, C, DESIGN.roadEdge);
+            rect(0, y + 3, W, C - 6, DESIGN.road);
+
+            for (let x = 8; x < W; x += 58) {
+              rect(x, y + C - 3, 29, 2, DESIGN.line);
+            }
+
+            for (const car of row.cars) {
+              const x = car.x, yc = y + 8;
+
+              rect(x - car.w / 2, yc, car.w, 31, car.color);
+              rect(x - car.w / 2 + 5, yc + 4, car.w - 10, 9, '#c9e5ee');
+              rect(x - car.w / 2 + 4, yc + 26, 7, 4, '#252a2d');
+              rect(x + car.w / 2 - 11, yc + 26, 7, 4, '#252a2d');
+              rect(x - 2, yc + 15, 4, 7, '#ffffff55');
+            }
+          }
+        }
+
+        const py = H - C - (player.row - camera) * C;
+        const px = player.x * C + C / 2;
+
+        rect(px - 12, py + 10, 24, 27, DESIGN.playerDetail);
+        rect(px - 10, py + 5, 20, 23, DESIGN.player);
+        rect(px - 7, py + 11, 4, 4, '#262626');
+        rect(px + 3, py + 11, 4, 4, '#262626');
+        rect(px - 8, py + 29, 6, 8, '#463b2d');
+        rect(px + 2, py + 29, 6, 8, '#463b2d');
+
+        ctx.strokeStyle = '#ffffff30';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(1, 1, W - 2, H - 2);
+      }
+
+      function loop(now) {
+        if (!running) return;
+        const dt = Math.min(40, now - lastTime);
+        lastTime = now;
+        update(dt, now);
+        draw();
+        if (running) raf = requestAnimationFrame(loop);
+      }
+
+      function direction(name) {
+        if (name === 'up') return { dx: 0, dy: 1 };
+        if (name === 'down') return { dx: 0, dy: -1 };
+        if (name === 'left') return { dx: -1, dy: 0 };
+        return { dx: 1, dy: 0 };
+      }
+
+      function beginMove(name) {
+        if (!running) return;
+        const d = direction(name);
+        move(d.dx, d.dy);
+        held = d;
+        heldStamp = performance.now();
+      }
+
+      function stopMove() { held = null }
+
+      document.querySelectorAll('[data-mode]').forEach(b => {
+        b.addEventListener('click', () => start(b.dataset.mode));
+      });
+
+      document.querySelectorAll('[data-move]').forEach(b => {
+        b.addEventListener('pointerdown', e => {
+          e.preventDefault();
+          beginMove(b.dataset.move);
+        });
+        ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => {
+          b.addEventListener(ev, stopMove);
+        });
+      });
+
+      document.getElementById('again').addEventListener('click', () => start(mode));
+
+      document.getElementById('select').addEventListener('click', () => {
+        over.style.display = 'none';
+        menu.style.display = 'flex';
+      });
+
+      document.getElementById('restart').addEventListener('click', () => start(mode));
+
+      document.getElementById('change').addEventListener('click', () => {
+        running = false;
+        held = null;
+        cancelAnimationFrame(raf);
+        over.style.display = 'none';
+        menu.style.display = 'flex';
+        draw();
+      });
+
+      // PC keyboard controls
+      function keyHandler(e) {
+        const map = {
+          ArrowUp: 'up', w: 'up', W: 'up',
+          ArrowDown: 'down', s: 'down', S: 'down',
+          ArrowLeft: 'left', a: 'left', A: 'left',
+          ArrowRight: 'right', d: 'right', D: 'right'
+        };
+
+        const name = map[e.key];
+        if (!name) return;
+
+        e.preventDefault();
+        if (e.repeat) return;
+        beginMove(name);
+      }
+
+      window.addEventListener('keydown', keyHandler, { passive: false });
+
+      window.addEventListener('keyup', e => {
+        if ([
+          'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+          'w', 'W', 'a', 'A', 's', 'S', 'd', 'D'
+        ].includes(e.key)) {
+          stopMove();
+        }
+      });
+
+      // Smartphone swipe / tap
+      let touchStart = null;
+
+      canvas.addEventListener('pointerdown', e => {
+        if (e.pointerType === 'mouse') return;
+        touchStart = { x: e.clientX, y: e.clientY };
+      });
+
+      canvas.addEventListener('pointerup', e => {
+        if (!touchStart) return;
+
+        const dx = e.clientX - touchStart.x;
+        const dy = e.clientY - touchStart.y;
+
+        if (Math.abs(dx) < 18 && Math.abs(dy) < 18) {
+          move(0, 1);
+        } else if (Math.abs(dx) > Math.abs(dy)) {
+          move(dx > 0 ? 1 : -1, 0);
+        } else {
+          move(0, dy < 0 ? 1 : -1);
+        }
+        touchStart = null;
+      });
+
+      canvas.addEventListener('pointercancel', () => touchStart = null);
+
+      draw();
+    })();
+  </script>
+</body>
+
+</html>
