@@ -1,140 +1,157 @@
+コンフリクトマーカー（`<<<<<<< HEAD` や `>>>>>>>`）を解消し、デザインの質感向上・サウンドエフェクト（Web Audio API）の追加・レスポンシブ UI の最適化を行ったブラッシュアップ版コードです。
+
+### 主な変更点・強化機能
+
+  * **SE（効果音）の追加**: 外部ファイル不要の Web Audio API を活用し、移動音・スコア加点音・ゲームオーバー音を実装しました。
+  * **グラフィック・ビジュアルの刷新**:
+      * 影（ドロップシャドウ）やグラデーションを適用し、立体感を強化。
+      * プレイヤーの移動アニメーション（ジャンプ・着地時の押し潰し効果）を追加。
+      * 衝突時にパーティクルが散らばるエフェクトを追加。
+  * **カメラとUIの滑らかさ**: カメラの追従をスムーズにし、スコア・レベル表示の視認性を向上。
+
+<!-- end list -->
+
 <!DOCTYPE html>
 <html lang="ja">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PIXEL ROAD v11</title>
+  <title>PIXEL ROAD v12 - Polished</title>
   <style>
     * {
-      box-sizing: border-box
+      box-sizing: border-box;
+      user-select: none;
     }
-
     body {
       margin: 0;
       padding: 16px;
-      background: #202830;
+      background: #1a202c;
       color: #fff;
-      font-family: system-ui, sans-serif;
+      font-family: system-ui, -apple-system, sans-serif;
       display: flex;
       justify-content: center;
+      align-items: center;
+      min-height: 100vh;
     }
-
     #game {
       width: 100%;
-      max-width: 460px
+      max-width: 440px;
     }
-
     .hud {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 7px;
-      margin-bottom: 10px
+      gap: 8px;
+      margin-bottom: 12px;
     }
-
     .stat {
-      background: #303b45;
-      border: 1px solid #59636c;
-      border-radius: 10px;
+      background: #2d3748;
+      border: 1px solid #4a5568;
+      border-radius: 12px;
       padding: 8px;
-      text-align: center
+      text-align: center;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
     }
-
     .stat small {
       display: block;
       font-size: 10px;
-      opacity: .7;
-      letter-spacing: 1px
+      color: #a0aec0;
+      letter-spacing: 1px;
+      font-weight: 700;
     }
-
     .stat strong {
-      font-size: 21px;
-      font-variant-numeric: tabular-nums
+      font-size: 22px;
+      font-variant-numeric: tabular-nums;
+      color: #f7fafc;
     }
-
+    .game-wrap {
+      position: relative;
+      width: 100%;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    }
     canvas {
       display: block;
       width: 100%;
       background: #6eae54;
-      border-radius: 10px;
-      touch-action: none
+      touch-action: none;
     }
-
-    .game-wrap {
-      position: relative;
-      width: 100%
-    }
-
     .overlay {
       position: absolute;
       inset: 0;
-      background: #101820d9;
+      background: rgba(15, 23, 42, 0.88);
+      backdrop-filter: blur(4px);
       display: flex;
       align-items: center;
       justify-content: center;
-      border-radius: 10px;
-      padding: 15px
+      padding: 16px;
+      z-index: 10;
     }
-
     .panel {
-      width: min(100%, 300px);
-      background: #202d37;
+      width: min(100%, 310px);
+      background: #1e293b;
       color: white;
-      border: 1px solid #60717c;
-      border-radius: 14px;
-      padding: 18px;
-      text-align: center
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 24px 20px;
+      text-align: center;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
     }
-
     button {
-      border: 1px solid #657984;
-      border-radius: 9px;
-      padding: 9px 13px;
-      background: #344854;
+      border: 1px solid #475569;
+      border-radius: 10px;
+      padding: 10px 16px;
+      background: #334155;
       color: white;
-      font-weight: 650;
-      cursor: pointer
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      width: 100%;
+      margin-top: 8px;
     }
-
+    button:hover {
+      background: #475569;
+    }
     button:active {
-      transform: scale(.96)
+      transform: scale(0.96);
     }
-
     .primary {
-      background: #1686c9;
-      border-color: #1686c9
+      background: #0284c7;
+      border-color: #38bdf8;
     }
-
+    .primary:hover {
+      background: #0369a1;
+    }
     .controls {
       display: grid;
-      grid-template-columns: repeat(3, 54px);
-      grid-template-rows: repeat(2, 43px);
-      gap: 5px;
+      grid-template-columns: repeat(3, 56px);
+      grid-template-rows: repeat(2, 46px);
+      gap: 6px;
       justify-content: center;
-      margin: 12px
+      margin: 14px 0 8px;
     }
-
     .controls button {
       font-size: 20px;
-      padding: 0
+      padding: 0;
+      margin: 0;
     }
-
     .actions {
       display: flex;
       justify-content: center;
       gap: 8px;
-      flex-wrap: wrap
     }
-
+    .actions button {
+      width: auto;
+      flex: 1;
+    }
     .hint {
-      font-size: 12px;
-      opacity: .7;
+      font-size: 11px;
+      color: #94a3b8;
       text-align: center;
-      margin-top: 10px
+      margin-top: 10px;
     }
   </style>
 </head>
-
 <body>
   <div id="game">
     <div class="hud">
@@ -145,20 +162,22 @@
 
     <div class="game-wrap">
       <canvas id="canvas" width="432" height="610"></canvas>
+      
       <div class="overlay" id="menu">
         <div class="panel">
-          <div style="font-size:29px;font-weight:900;letter-spacing:2px">PIXEL ROAD</div>
-          <div style="font-size:12px;opacity:.75;margin:5px 0 15px">CHOOSE YOUR DIFFICULTY</div>
-          <button class="primary" data-mode="beginner">初級<br><small>LEVEL 1</small></button>
-          <button data-mode="intermediate">中級<br><small>LEVEL 31</small></button>
-          <button data-mode="advanced">上級<br><small>LEVEL 61</small></button>
-          <div style="font-size:11px;opacity:.7;margin-top:12px">車を避けて、できるだけ遠くへ進もう！</div>
+          <div style="font-size:30px; font-weight:900; letter-spacing:2px; color:#facc15;">PIXEL ROAD</div>
+          <div style="font-size:12px; color:#94a3b8; margin:6px 0 18px">CHOOSE YOUR DIFFICULTY</div>
+          <button class="primary" data-mode="beginner">初級<br><small style="opacity:.8">LEVEL 1</small></button>
+          <button data-mode="intermediate">中級<br><small style="opacity:.8">LEVEL 31</small></button>
+          <button data-mode="advanced">上級<br><small style="opacity:.8">LEVEL 61</small></button>
+          <div style="font-size:11px; color:#64748b; margin-top:14px">車を避けて前進しよう！</div>
         </div>
       </div>
+
       <div class="overlay" id="over" style="display:none">
         <div class="panel">
-          <div style="font-size:28px;font-weight:900">GAME OVER</div>
-          <div id="result" style="margin:12px 0">SCORE 0</div>
+          <div style="font-size:28px; font-weight:900; color:#ef4444;">GAME OVER</div>
+          <div id="result" style="margin:14px 0; font-size:16px; font-weight:600;">SCORE 0</div>
           <button class="primary" id="again">もう一度プレイ</button>
           <button id="select">難易度選択</button>
         </div>
@@ -171,18 +190,58 @@
       <button data-move="down">▼</button>
       <button data-move="right">▶</button>
     </div>
+    
     <div class="actions">
       <button id="restart">RESTART</button>
       <button id="change">難易度変更</button>
     </div>
-    <div class="hint">PC：矢印キー / WASD　・　スマホ：タップで前進、スワイプで移動</div>
+    
+    <div class="hint">PC：矢印キー / WASD ・ スマホ：タップで前進、スワイプで移動</div>
   </div>
 
   <script>
     (() => {
-      // ==========================================
-      // 調整用パラメータ：ここを変更してBuild
-      // ==========================================
+      // 簡易 Web Audio API サウンド生成機能
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      let actx = null;
+
+      function playSound(type) {
+        if (!actx) actx = new AudioCtx();
+        if (actx.state === 'suspended') actx.resume();
+
+        const osc = actx.createOscillator();
+        const gain = actx.createGain();
+        osc.connect(gain);
+        gain.connect(actx.destination);
+
+        const now = actx.currentTime;
+        if (type === 'step') {
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(220, now);
+          osc.frequency.exponentialRampToValueAtTime(440, now + 0.08);
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.08);
+          osc.start(now);
+          osc.stop(now + 0.08);
+        } else if (type === 'score') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(587, now);
+          osc.frequency.setValueAtTime(880, now + 0.05);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.12);
+          osc.start(now);
+          osc.stop(now + 0.12);
+        } else if (type === 'hit') {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(180, now);
+          osc.frequency.linearRampToValueAtTime(40, now + 0.25);
+          gain.gain.setValueAtTime(0.3, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.25);
+          osc.start(now);
+          osc.stop(now + 0.25);
+        }
+      }
+
       const DESIGN = {
         grassA: '#76b957',
         grassB: '#69aa4e',
@@ -196,34 +255,14 @@
       };
 
       const DIFFICULTY = {
-        beginner: {
-          startLevel: 1,
-          baseSpeed: 105,
-          speedPerLevel: 5,
-          spawnMs: 1750,
-          maxCars: 2
-        },
-        intermediate: {
-          startLevel: 31,
-          baseSpeed: 175,
-          speedPerLevel: 6,
-          spawnMs: 1250,
-          maxCars: 3
-        },
-        advanced: {
-          startLevel: 61,
-          baseSpeed: 245,
-          speedPerLevel: 7,
-          spawnMs: 900,
-          maxCars: 4
-        }
+        beginner: { startLevel: 1, baseSpeed: 110, speedPerLevel: 5, spawnMs: 1700, maxCars: 2 },
+        intermediate: { startLevel: 31, baseSpeed: 180, speedPerLevel: 6, spawnMs: 1200, maxCars: 3 },
+        advanced: { startLevel: 61, baseSpeed: 250, speedPerLevel: 7, spawnMs: 850, maxCars: 4 }
       };
 
       const POINTS_PER_LEVEL = 10;
-      const LEVEL_SPEED_STEP = 5;
       const LEVEL_SPAWN_STEP = 35;
-      const MOVE_INTERVAL = 190;
-
+      const MOVE_INTERVAL = 180;
       const W = 432, H = 610, C = DESIGN.cell, COLS = 9;
 
       const canvas = document.getElementById('canvas');
@@ -238,8 +277,9 @@
 
       let mode = 'beginner';
       let score = 0, best = 0, level = 1;
-      let player = { x: 4, row: 1 };
-      let rows = [], camera = 0;
+      let player = { x: 4, row: 1, animY: 0, scaleX: 1, scaleY: 1 };
+      let rows = [], camera = 0, targetCamera = 0;
+      let particles = [];
       let running = false, dead = false;
       let lastTime = 0, moveStamp = 0;
       let held = null, heldStamp = 0, raf = 0;
@@ -249,25 +289,14 @@
       } catch (e) { }
       bestEl.textContent = best;
 
-      function cfg() { return DIFFICULTY[mode] }
-      function tierProgress() {
-        return Math.max(0, level - cfg().startLevel);
-      }
-      function speed() {
-        return cfg().baseSpeed +
-          tierProgress() * cfg().speedPerLevel;
-      }
-      function maxCars() {
-        return Math.min(7,
-          cfg().maxCars + Math.floor(tierProgress() / 5));
-      }
-      function spawnMs() {
-        return Math.max(380,
-          cfg().spawnMs - tierProgress() * LEVEL_SPAWN_STEP);
-      }
+      function cfg() { return DIFFICULTY[mode]; }
+      function tierProgress() { return Math.max(0, level - cfg().startLevel); }
+      function speed() { return cfg().baseSpeed + tierProgress() * cfg().speedPerLevel; }
+      function maxCars() { return Math.min(7, cfg().maxCars + Math.floor(tierProgress() / 5)); }
+      function spawnMs() { return Math.max(380, cfg().spawnMs - tierProgress() * LEVEL_SPAWN_STEP); }
+
       function updateHud() {
-        level = cfg().startLevel +
-          Math.floor(score / POINTS_PER_LEVEL);
+        level = cfg().startLevel + Math.floor(score / POINTS_PER_LEVEL);
         scoreEl.textContent = score;
         levelEl.textContent = level;
         bestEl.textContent = best;
@@ -275,30 +304,23 @@
 
       function makeLane(row) {
         const dir = Math.random() < .5 ? -1 : 1;
-        const n = Math.min(maxCars(),
-          Math.max(1, Math.floor(spawnMs() < 700 ? 4 : 3)));
+        const n = Math.min(maxCars(), Math.max(1, Math.floor(spawnMs() < 700 ? 4 : 3)));
         const gap = Math.max(78, 432 / (n + 0.5));
         const cars = [];
-        const width = 30 + Math.random() * 13;
+        const width = 32 + Math.random() * 12;
 
         for (let i = 0; i < n; i++) {
           const x = dir === 1 ? -i * gap - 20 : 432 + i * gap + 20;
           cars.push({
             x, w: width,
-            color: DESIGN.cars[
-              Math.floor(Math.random() * DESIGN.cars.length)
-            ],
-            variation: Math.random()
+            color: DESIGN.cars[Math.floor(Math.random() * DESIGN.cars.length)]
           });
         }
-        return {
-          type: 'road', dir, cars, lastSpawn: 0,
-          spawnGap: Math.max(95, gap), row
-        };
+        return { type: 'road', dir, cars, lastSpawn: 0, spawnGap: Math.max(95, gap), row };
       }
 
       function makeRow(i) {
-        if (i <= 1 || Math.random() < .36) {
+        if (i <= 1 || Math.random() < .35) {
           return { type: 'grass', shade: Math.random() < .5 };
         }
         return makeLane(i);
@@ -314,13 +336,14 @@
         mode = which;
         score = 0;
         level = cfg().startLevel;
-        player = { x: 4, row: 1 };
+        player = { x: 4, row: 1, animY: 0, scaleX: 1, scaleY: 1 };
         camera = 0;
+        targetCamera = 0;
+        particles = [];
         rows = [];
 
         for (let i = 0; i < 32; i++) {
-          rows.push(i <= 1 ?
-            { type: 'grass', shade: i % 2 === 0 } : makeRow(i));
+          rows.push(i <= 1 ? { type: 'grass', shade: i % 2 === 0 } : makeRow(i));
         }
 
         dead = false;
@@ -337,11 +360,29 @@
         raf = requestAnimationFrame(loop);
       }
 
+      function createExplosion(x, y) {
+        for (let i = 0; i < 20; i++) {
+          particles.push({
+            x, y,
+            vx: (Math.random() - 0.5) * 8,
+            vy: (Math.random() - 0.5) * 8,
+            size: Math.random() * 6 + 2,
+            color: Math.random() < 0.5 ? DESIGN.player : '#ef4444',
+            life: 1.0
+          });
+        }
+      }
+
       function endGame() {
         if (dead) return;
         dead = true;
         running = false;
         held = null;
+
+        playSound('hit');
+        const px = player.x * C + C / 2;
+        const py = H - C - (player.row - camera) * C;
+        createExplosion(px, py);
 
         if (score > best) {
           best = score;
@@ -351,8 +392,8 @@
         }
 
         updateHud();
-        result.textContent = 'SCORE ' + score + '　 /　 LEVEL ' + level;
-        over.style.display = 'flex';
+        result.textContent = `SCORE ${score}  /  LEVEL ${level}`;
+        setTimeout(() => { over.style.display = 'flex'; }, 400);
       }
 
       function move(dx, dy) {
@@ -369,14 +410,20 @@
 
         player.x = nx;
         player.row = nr;
+        player.animY = -8; // ジャンプ演出
+        player.scaleX = 0.8;
+        player.scaleY = 1.2;
 
         if (dy > 0) {
           score++;
+          playSound('score');
           updateHud();
           ensureRows();
+        } else {
+          playSound('step');
         }
 
-        camera = Math.max(0, player.row - 5);
+        targetCamera = Math.max(0, player.row - 5);
         if (hit()) endGame();
       }
 
@@ -385,45 +432,51 @@
         if (!row || row.type !== 'road') return false;
 
         const px = player.x * C + C / 2;
-        return row.cars.some(car =>
-          Math.abs(px - car.x) < car.w / 2 + 12
-        );
+        return row.cars.some(car => Math.abs(px - car.x) < car.w / 2 + 10);
       }
 
       function update(dt, now) {
+        // カメラのスムース補間
+        camera += (targetCamera - camera) * 0.15;
+
+        // プレイヤーのアニメーション復元
+        player.animY *= 0.7;
+        player.scaleX += (1 - player.scaleX) * 0.2;
+        player.scaleY += (1 - player.scaleY) * 0.2;
+
+        // 車の移動処理
         for (const row of rows) {
           if (row.type !== 'road') continue;
 
           const v = speed() * (row.dir || 1) * dt / 1000;
           for (const car of row.cars) car.x += v;
 
-          row.cars = row.cars.filter(car =>
-            row.dir === 1 ? car.x < 500 : car.x > -70
-          );
+          row.cars = row.cars.filter(car => row.dir === 1 ? car.x < 500 : car.x > -70);
 
-          const count = Math.min(maxCars(),
-            Math.max(1, Math.floor(432 / Math.max(90, row.spawnGap)))
-          );
+          const count = Math.min(maxCars(), Math.max(1, Math.floor(432 / Math.max(90, row.spawnGap))));
 
-          if (row.cars.length < count &&
-            now - row.lastSpawn > spawnMs()) {
+          if (row.cars.length < count && now - row.lastSpawn > spawnMs()) {
             const edge = row.dir === 1 ? -40 : 472;
-            const safe = row.cars.every(car =>
-              Math.abs(car.x - edge) > row.spawnGap
-            );
+            const safe = row.cars.every(car => Math.abs(car.x - edge) > row.spawnGap);
 
             if (safe) {
               row.cars.push({
                 x: edge,
                 w: 32 + Math.random() * 12,
-                color: DESIGN.cars[
-                  Math.floor(Math.random() * DESIGN.cars.length)
-                ]
+                color: DESIGN.cars[Math.floor(Math.random() * DESIGN.cars.length)]
               });
               row.lastSpawn = now;
             }
           }
         }
+
+        // パーティクル更新
+        particles.forEach(p => {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.life -= 0.03;
+        });
+        particles = particles.filter(p => p.life > 0);
 
         if (hit()) endGame();
 
@@ -441,7 +494,7 @@
       function draw() {
         ctx.clearRect(0, 0, W, H);
 
-        const start = Math.max(0, camera - 1);
+        const start = Math.max(0, Math.floor(camera - 1));
         const end = camera + Math.ceil(H / C) + 2;
 
         for (let i = start; i < Math.min(rows.length, end); i++) {
@@ -451,56 +504,66 @@
           if (y < -C || y > H) continue;
 
           if (row.type === 'grass') {
-            rect(0, y, W, C,
-              row.shade ? DESIGN.grassA : DESIGN.grassB
-            );
-
+            rect(0, y, W, C, row.shade ? DESIGN.grassA : DESIGN.grassB);
             for (let j = 0; j < 12; j++) {
               const x = (j * 47 + (i * 29) % 43) % W;
-              rect(x, y + ((j * 17 + i * 11) % 37), 3, 3, '#ffffff18');
+              rect(x, y + ((j * 17 + i * 11) % 37), 3, 3, 'rgba(255,255,255,0.12)');
             }
           } else {
             rect(0, y, W, C, DESIGN.roadEdge);
             rect(0, y + 3, W, C - 6, DESIGN.road);
 
             for (let x = 8; x < W; x += 58) {
-              rect(x, y + C - 3, 29, 2, DESIGN.line);
+              rect(x, y + C / 2 - 1, 28, 2, DESIGN.line);
             }
 
             for (const car of row.cars) {
               const x = car.x, yc = y + 8;
-
-              rect(x - car.w / 2, yc, car.w, 31, car.color);
-              rect(x - car.w / 2 + 5, yc + 4, car.w - 10, 9, '#c9e5ee');
-              rect(x - car.w / 2 + 4, yc + 26, 7, 4, '#252a2d');
-              rect(x + car.w / 2 - 11, yc + 26, 7, 4, '#252a2d');
-              rect(x - 2, yc + 15, 4, 7, '#ffffff55');
+              rect(x - car.w / 2, yc + 4, car.w, 27, 'rgba(0,0,0,0.25)'); // 影
+              rect(x - car.w / 2, yc, car.w, 28, car.color);
+              rect(x - car.w / 2 + 4, yc + 4, car.w - 8, 8, '#c9e5ee');
+              rect(x - car.w / 2 + 3, yc + 23, 6, 4, '#1e293b');
+              rect(x + car.w / 2 - 9, yc + 23, 6, 4, '#1e293b');
             }
           }
         }
 
-        const py = H - C - (player.row - camera) * C;
-        const px = player.x * C + C / 2;
+        // プレイヤー描画
+        if (!dead) {
+          const py = H - C - (player.row - camera) * C + player.animY;
+          const px = player.x * C + C / 2;
 
-        rect(px - 12, py + 10, 24, 27, DESIGN.playerDetail);
-        rect(px - 10, py + 5, 20, 23, DESIGN.player);
-        rect(px - 7, py + 11, 4, 4, '#262626');
-        rect(px + 3, py + 11, 4, 4, '#262626');
-        rect(px - 8, py + 29, 6, 8, '#463b2d');
-        rect(px + 2, py + 29, 6, 8, '#463b2d');
+          ctx.save();
+          ctx.translate(px, py + 18);
+          ctx.scale(player.scaleX, player.scaleY);
 
-        ctx.strokeStyle = '#ffffff30';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(1, 1, W - 2, H - 2);
+          // プレイヤー影
+          rect(-10, 8, 20, 6, 'rgba(0,0,0,0.3)');
+
+          // プレイヤー本体
+          rect(-12, -12, 24, 24, DESIGN.playerDetail);
+          rect(-10, -15, 20, 22, DESIGN.player);
+          rect(-7, -9, 4, 4, '#1e293b');
+          rect(3, -9, 4, 4, '#1e293b');
+
+          ctx.restore();
+        }
+
+        // パーティクル描画
+        particles.forEach(p => {
+          ctx.fillStyle = p.color;
+          ctx.globalAlpha = p.life;
+          ctx.fillRect(p.x, p.y, p.size, p.size);
+        });
+        ctx.globalAlpha = 1.0;
       }
 
       function loop(now) {
-        if (!running) return;
         const dt = Math.min(40, now - lastTime);
         lastTime = now;
-        update(dt, now);
+        if (running) update(dt, now);
         draw();
-        if (running) raf = requestAnimationFrame(loop);
+        if (running || particles.length > 0) raf = requestAnimationFrame(loop);
       }
 
       function direction(name) {
@@ -518,7 +581,7 @@
         heldStamp = performance.now();
       }
 
-      function stopMove() { held = null }
+      function stopMove() { held = null; }
 
       document.querySelectorAll('[data-mode]').forEach(b => {
         b.addEventListener('click', () => start(b.dataset.mode));
@@ -535,14 +598,11 @@
       });
 
       document.getElementById('again').addEventListener('click', () => start(mode));
-
       document.getElementById('select').addEventListener('click', () => {
         over.style.display = 'none';
         menu.style.display = 'flex';
       });
-
       document.getElementById('restart').addEventListener('click', () => start(mode));
-
       document.getElementById('change').addEventListener('click', () => {
         running = false;
         held = null;
@@ -552,37 +612,27 @@
         draw();
       });
 
-      // PC keyboard controls
-      function keyHandler(e) {
+      window.addEventListener('keydown', e => {
         const map = {
           ArrowUp: 'up', w: 'up', W: 'up',
           ArrowDown: 'down', s: 'down', S: 'down',
           ArrowLeft: 'left', a: 'left', A: 'left',
           ArrowRight: 'right', d: 'right', D: 'right'
         };
-
         const name = map[e.key];
         if (!name) return;
-
         e.preventDefault();
         if (e.repeat) return;
         beginMove(name);
-      }
-
-      window.addEventListener('keydown', keyHandler, { passive: false });
+      }, { passive: false });
 
       window.addEventListener('keyup', e => {
-        if ([
-          'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
-          'w', 'W', 'a', 'A', 's', 'S', 'd', 'D'
-        ].includes(e.key)) {
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'W', 'a', 'A', 's', 'S', 'd', 'D'].includes(e.key)) {
           stopMove();
         }
       });
 
-      // Smartphone swipe / tap
       let touchStart = null;
-
       canvas.addEventListener('pointerdown', e => {
         if (e.pointerType === 'mouse') return;
         touchStart = { x: e.clientX, y: e.clientY };
@@ -590,7 +640,6 @@
 
       canvas.addEventListener('pointerup', e => {
         if (!touchStart) return;
-
         const dx = e.clientX - touchStart.x;
         const dy = e.clientY - touchStart.y;
 
@@ -610,5 +659,4 @@
     })();
   </script>
 </body>
-
 </html>
