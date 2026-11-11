@@ -1,18 +1,19 @@
-コンフリクトマーカー（`<<<<<<< HEAD` や `>>>>>>>`）を解消し、デザインの質感向上・サウンドエフェクト（Web Audio API）の追加・レスポンシブ UI の最適化を行ったブラッシュアップ版コードです。
+<!-- 
+コンフリクトマーカー（`<<<<<<< HEAD` や `>>>>>>>`)を解消し、デザインの質感向上・サウンドエフェクト（Web Audio API）の追加・レスポンシブ UI の最適化を行ったブラッシュアップ版コードです。
 
 ### 主な変更点・強化機能
 
-  * **SE（効果音）の追加**: 外部ファイル不要の Web Audio API を活用し、移動音・スコア加点音・ゲームオーバー音を実装しました。
+  * **SE(効果音)の追加**: 外部ファイル不要の Web Audio API を活用し、移動音・スコア加点音・ゲームオーバー音を実装しました。
   * **グラフィック・ビジュアルの刷新**:
       * 影（ドロップシャドウ）やグラデーションを適用し、立体感を強化。
       * プレイヤーの移動アニメーション（ジャンプ・着地時の押し潰し効果）を追加。
       * 衝突時にパーティクルが散らばるエフェクトを追加。
-  * **カメラとUIの滑らかさ**: カメラの追従をスムーズにし、スコア・レベル表示の視認性を向上。
-
-<!-- end list -->
+  * **カメラとUIの滑らかさ**: カメラの追従をスムーズにし、スコア・レベル表示の視認性を向上。 
+-->
 
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -22,6 +23,7 @@
       box-sizing: border-box;
       user-select: none;
     }
+
     body {
       margin: 0;
       padding: 16px;
@@ -33,16 +35,19 @@
       align-items: center;
       min-height: 100vh;
     }
+
     #game {
       width: 100%;
       max-width: 440px;
     }
+
     .hud {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 8px;
       margin-bottom: 12px;
     }
+
     .stat {
       background: #2d3748;
       border: 1px solid #4a5568;
@@ -51,6 +56,7 @@
       text-align: center;
       box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
     }
+
     .stat small {
       display: block;
       font-size: 10px;
@@ -58,11 +64,13 @@
       letter-spacing: 1px;
       font-weight: 700;
     }
+
     .stat strong {
       font-size: 22px;
       font-variant-numeric: tabular-nums;
       color: #f7fafc;
     }
+
     .game-wrap {
       position: relative;
       width: 100%;
@@ -70,12 +78,14 @@
       overflow: hidden;
       box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
     }
+
     canvas {
       display: block;
       width: 100%;
       background: #6eae54;
       touch-action: none;
     }
+
     .overlay {
       position: absolute;
       inset: 0;
@@ -87,6 +97,7 @@
       padding: 16px;
       z-index: 10;
     }
+
     .panel {
       width: min(100%, 310px);
       background: #1e293b;
@@ -97,6 +108,7 @@
       text-align: center;
       box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
     }
+
     button {
       border: 1px solid #475569;
       border-radius: 10px;
@@ -109,19 +121,24 @@
       width: 100%;
       margin-top: 8px;
     }
+
     button:hover {
       background: #475569;
     }
+
     button:active {
       transform: scale(0.96);
     }
+
     .primary {
       background: #0284c7;
       border-color: #38bdf8;
     }
+
     .primary:hover {
       background: #0369a1;
     }
+
     .controls {
       display: grid;
       grid-template-columns: repeat(3, 56px);
@@ -130,20 +147,24 @@
       justify-content: center;
       margin: 14px 0 8px;
     }
+
     .controls button {
       font-size: 20px;
       padding: 0;
       margin: 0;
     }
+
     .actions {
       display: flex;
       justify-content: center;
       gap: 8px;
     }
+
     .actions button {
       width: auto;
       flex: 1;
     }
+
     .hint {
       font-size: 11px;
       color: #94a3b8;
@@ -152,6 +173,7 @@
     }
   </style>
 </head>
+
 <body>
   <div id="game">
     <div class="hud">
@@ -162,7 +184,7 @@
 
     <div class="game-wrap">
       <canvas id="canvas" width="432" height="610"></canvas>
-      
+
       <div class="overlay" id="menu">
         <div class="panel">
           <div style="font-size:30px; font-weight:900; letter-spacing:2px; color:#facc15;">PIXEL ROAD</div>
@@ -190,12 +212,12 @@
       <button data-move="down">▼</button>
       <button data-move="right">▶</button>
     </div>
-    
+
     <div class="actions">
       <button id="restart">RESTART</button>
       <button id="change">難易度変更</button>
     </div>
-    
+
     <div class="hint">PC：矢印キー / WASD ・ スマホ：タップで前進、スワイプで移動</div>
   </div>
 
@@ -255,9 +277,9 @@
       };
 
       const DIFFICULTY = {
-        beginner: { startLevel: 1, baseSpeed: 110, speedPerLevel: 5, spawnMs: 1700, maxCars: 2 },
-        intermediate: { startLevel: 31, baseSpeed: 180, speedPerLevel: 6, spawnMs: 1200, maxCars: 3 },
-        advanced: { startLevel: 61, baseSpeed: 250, speedPerLevel: 7, spawnMs: 850, maxCars: 4 }
+        beginner: {startLevel: 1, baseSpeed: 110, speedPerLevel: 5, spawnMs: 1700, maxCars: 2},
+        intermediate: {startLevel: 31, baseSpeed: 180, speedPerLevel: 6, spawnMs: 1200, maxCars: 3},
+        advanced: {startLevel: 61, baseSpeed: 250, speedPerLevel: 7, spawnMs: 850, maxCars: 4}
       };
 
       const POINTS_PER_LEVEL = 10;
@@ -277,7 +299,7 @@
 
       let mode = 'beginner';
       let score = 0, best = 0, level = 1;
-      let player = { x: 4, row: 1, animY: 0, scaleX: 1, scaleY: 1 };
+      let player = {x: 4, row: 1, animY: 0, scaleX: 1, scaleY: 1};
       let rows = [], camera = 0, targetCamera = 0;
       let particles = [];
       let running = false, dead = false;
@@ -289,11 +311,11 @@
       } catch (e) { }
       bestEl.textContent = best;
 
-      function cfg() { return DIFFICULTY[mode]; }
-      function tierProgress() { return Math.max(0, level - cfg().startLevel); }
-      function speed() { return cfg().baseSpeed + tierProgress() * cfg().speedPerLevel; }
-      function maxCars() { return Math.min(7, cfg().maxCars + Math.floor(tierProgress() / 5)); }
-      function spawnMs() { return Math.max(380, cfg().spawnMs - tierProgress() * LEVEL_SPAWN_STEP); }
+      function cfg() {return DIFFICULTY[mode];}
+      function tierProgress() {return Math.max(0, level - cfg().startLevel);}
+      function speed() {return cfg().baseSpeed + tierProgress() * cfg().speedPerLevel;}
+      function maxCars() {return Math.min(7, cfg().maxCars + Math.floor(tierProgress() / 5));}
+      function spawnMs() {return Math.max(380, cfg().spawnMs - tierProgress() * LEVEL_SPAWN_STEP);}
 
       function updateHud() {
         level = cfg().startLevel + Math.floor(score / POINTS_PER_LEVEL);
@@ -316,12 +338,12 @@
             color: DESIGN.cars[Math.floor(Math.random() * DESIGN.cars.length)]
           });
         }
-        return { type: 'road', dir, cars, lastSpawn: 0, spawnGap: Math.max(95, gap), row };
+        return {type: 'road', dir, cars, lastSpawn: 0, spawnGap: Math.max(95, gap), row};
       }
 
       function makeRow(i) {
         if (i <= 1 || Math.random() < .35) {
-          return { type: 'grass', shade: Math.random() < .5 };
+          return {type: 'grass', shade: Math.random() < .5};
         }
         return makeLane(i);
       }
@@ -336,14 +358,14 @@
         mode = which;
         score = 0;
         level = cfg().startLevel;
-        player = { x: 4, row: 1, animY: 0, scaleX: 1, scaleY: 1 };
+        player = {x: 4, row: 1, animY: 0, scaleX: 1, scaleY: 1};
         camera = 0;
         targetCamera = 0;
         particles = [];
         rows = [];
 
         for (let i = 0; i < 32; i++) {
-          rows.push(i <= 1 ? { type: 'grass', shade: i % 2 === 0 } : makeRow(i));
+          rows.push(i <= 1 ? {type: 'grass', shade: i % 2 === 0} : makeRow(i));
         }
 
         dead = false;
@@ -393,7 +415,7 @@
 
         updateHud();
         result.textContent = `SCORE ${score}  /  LEVEL ${level}`;
-        setTimeout(() => { over.style.display = 'flex'; }, 400);
+        setTimeout(() => {over.style.display = 'flex';}, 400);
       }
 
       function move(dx, dy) {
@@ -567,10 +589,10 @@
       }
 
       function direction(name) {
-        if (name === 'up') return { dx: 0, dy: 1 };
-        if (name === 'down') return { dx: 0, dy: -1 };
-        if (name === 'left') return { dx: -1, dy: 0 };
-        return { dx: 1, dy: 0 };
+        if (name === 'up') return {dx: 0, dy: 1};
+        if (name === 'down') return {dx: 0, dy: -1};
+        if (name === 'left') return {dx: -1, dy: 0};
+        return {dx: 1, dy: 0};
       }
 
       function beginMove(name) {
@@ -581,7 +603,7 @@
         heldStamp = performance.now();
       }
 
-      function stopMove() { held = null; }
+      function stopMove() {held = null;}
 
       document.querySelectorAll('[data-mode]').forEach(b => {
         b.addEventListener('click', () => start(b.dataset.mode));
@@ -624,7 +646,7 @@
         e.preventDefault();
         if (e.repeat) return;
         beginMove(name);
-      }, { passive: false });
+      }, {passive: false});
 
       window.addEventListener('keyup', e => {
         if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'W', 'a', 'A', 's', 'S', 'd', 'D'].includes(e.key)) {
@@ -635,7 +657,7 @@
       let touchStart = null;
       canvas.addEventListener('pointerdown', e => {
         if (e.pointerType === 'mouse') return;
-        touchStart = { x: e.clientX, y: e.clientY };
+        touchStart = {x: e.clientX, y: e.clientY};
       });
 
       canvas.addEventListener('pointerup', e => {
@@ -659,4 +681,5 @@
     })();
   </script>
 </body>
+
 </html>
